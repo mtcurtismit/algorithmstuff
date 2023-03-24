@@ -1,0 +1,192 @@
+from typing import Dict, List
+from datamodel import OrderDepth, TradingState, Order
+import numpy as np
+class Derivative:
+    def __init__(self):
+        self.thearray = np.zeros(3,)
+    def add_datapoint(self, buy, sell, diff):
+        high = buy
+        low = sell
+        voltrend = diff
+        newrow = [high, low, voltrend]
+        self.thearray = np.vstack([self.thearray, newrow])
+        if len(self.thearray) > 50:
+            np.delete(self.thearray, 1, 0)
+            print('data deleted')
+    def extract_data(self):
+        return (len(self.thearray), self.thearray)
+
+    def calculate_derivatives(self):
+        voltrends = [row[2] for row in self.thearray]
+        (summ, numm) = (0, 0)
+        for trend in voltrends:
+            summ += trend
+            numm += 1
+        mean = summ/numm
+        voltrends.reverse
+        dlist = []
+        for trend in dlist:
+            trend = trend/mean
+            if len(dlist) == 0:
+                prev = trend
+            if len(dlist) > 5:
+                if trend-prev-dlist[-1] > 0.5:
+                    print('break accessed')
+                    break
+            else:
+                dlist.append(trend-prev)
+                prev = trend
+        (buys, sells) = ([], [])
+        for num in range(len(dlist)):
+            data = self.thearray[num]
+            buys.append(data[0])
+            sells.append(data[1])
+        buytrend =(buys[0] - buys[-1])/len(buys)
+        selltrend =(sells[0] - sells[-1])/len(buys)
+        return (buytrend, selltrend)
+    def market_maker(self):
+        current_info = self.thearray[-1]
+        (buy, sell, voltrend) = current_info
+        gap = buy-sell
+        fair = (buy+sell)/2
+        #past_info = self.thearray[-2]
+        #(buyx, sellx, voltrendx) = past_info
+        #gapx = buyx-sellx
+        return fair
+    def calculate_fair_price(self, position, limit):
+        #(buytrend, selltrend) = Derivative.calculate_derivatives(self)
+        current_info = self.thearray[-1]
+        (buy, sell, voltrend) = current_info
+        if voltrend > 0:
+            fair = buy
+            action = 'SELL'
+        else:
+            fair = sell
+            action = "BUY"
+        return (fair, action, voltrend)
+
+
+
+
+
+
+
+class Trader:
+
+    def run(self, state: TradingState) -> Dict[str, List[Order]]:
+        """
+        Only method required. It takes all buy and sell orders for all symbols as an input,
+        and outputs a list of orders to be sent
+        """
+        # Initialize the method output dict as an empty dict
+        PINA_COLADASx = Derivative()
+        BANANASx = Derivative()
+        PEARLSx = Derivative()
+        COCONUTSx = Derivative()
+        DIVING_GEARx = Derivative()
+        BERRIESx = Derivative()
+        DOLPHIN_SIGHTINGSx = Derivative()
+        print('Derivatives initialized')
+        result = {}
+        # Iterate over all the keys (the available products) contained in the order depths
+        for product in state.order_depths.keys():
+            print('PRODUCT', product)
+            if product == 'PINA_COLADAS':
+                dataset = PINA_COLADASx
+                limit = 300
+            if product == 'BANANAS':
+                dataset = BANANASx
+                limit = 20
+            if product == 'PEARLS':
+                dataset = PEARLSx
+                limit = 20
+            if product == 'COCONUTS':
+                dataset = COCONUTSx
+                limit = 600
+            if product == 'DIVING_GEAR':
+                dataset = DIVING_GEARx
+                limit = 50
+            if product == 'BERRIES':
+                dataset = BERRIESx
+                limit = 600
+            # Check if the current product is the 'PEARLS' product, only then run the order logic
+            #positiona= state.position[product]
+            positiona = limit
+
+            # Retrieve the Order Depth containing all the market BUY and SELL orders for PEARLS
+            order_depth: OrderDepth = state.order_depths[product]
+
+            dataset.add_datapoint(max(order_depth.buy_orders.keys()),  min(order_depth.sell_orders.keys()),
+                            len(order_depth.buy_orders.keys())-len(order_depth.sell_orders.keys()))
+
+            # Initialize the list of Orders to be sent as an empty list
+            orders: list[Order] = []
+            (askvol, bidvol) = (0,0)
+            # Define a fair value for the PEARLS.
+            # Note that this value of 1 is just a dummy value, you should likely change it!
+            acceptable_price = dataset.market_maker()
+
+            # If statement checks if there are any SELL orders in the PEARLS market
+            if len(order_depth.sell_orders) > 0:
+
+                # Sort all the available sell orders by their price,
+                # and select only the sell order with the lowest price
+                #for order in order_depth.sell_orders.keys():
+                    #if order < acceptable_price:
+                        #askvol += 1
+                #bestask = min(order_depth.sell_orders.keys())        
+                #askvol = min(order_depth.sell_orders[bestask], limit)
+                #if bestask < acceptable_price:
+                    #print("BUY", str(-askvol) + "x", bestask)
+                    #orders.append(Order(product, bestask, -askvol))
+                #for order in order_depth.buy_orders.keys():
+                    #if order > acceptable_price:
+                        #bidvol += 1
+                #bestbid = max(order_depth.buy_orders.keys())
+                #bidvol = min(order_depth.buy_orders[bestbid], limit)
+                #if bestbid > acceptable_price:
+                    #print("SELL", str(-bidvol) + "x", bestbid)
+                    #orders.append(Order(product, bestbid, -bidvol))
+
+
+                best_ask = min(order_depth.sell_orders.keys())
+                best_ask_volume = order_depth.sell_orders[best_ask]
+
+                # Check if the lowest ask (sell order) is lower than the above defined fair value
+                if best_ask < acceptable_price:
+
+                    # In case the lowest ask is lower than our fair value,
+                    # This presents an opportunity for us to buy cheaply
+                    # The code below therefore sends a BUY order at the price level of the ask,
+                    # with the same quantity
+                    # We expect this order to trade with the sell order
+                    print("BUY", str(-best_ask_volume) + "x", best_ask)
+                    orders.append(Order(product, best_ask, -best_ask_volume))
+                else:
+                    print("BUY", str(-best_ask_volume) + "x", acceptable_price)
+                    orders.append(Order(product, best_ask,-best_ask_volume))
+
+            # The below code block is similar to the one above,
+            # the difference is that it finds the highest bid (buy order)
+            # If the price of the order is higher than the fair value
+            # This is an opportunity to sell at a premium
+            if len(order_depth.buy_orders) != 0:
+                best_bid = max(order_depth.buy_orders.keys())
+                best_bid_volume = order_depth.buy_orders[best_bid]
+                if best_bid > acceptable_price:
+                    print("SELL", str(best_bid_volume) + "x", best_bid)
+                    orders.append(Order(product, best_bid, -best_bid_volume))
+                else:
+                    print("SELL", str(best_bid_volume) + "x", best_bid)
+                    orders.append(Order(product, best_bid,-best_bid_volume))
+
+            # Add all the above orders to the result dict
+            result[product] = orders
+        print('PC', PINA_COLADASx.extract_data())
+        print('Bananas', BANANASx.extract_data())
+        print('Pearls', PEARLSx.extract_data())
+        print('Coconuts', COCONUTSx.extract_data())
+            # Return the dict of orders
+            # These possibly contain buy or sell orders for PEARLS
+            # Depending on the logic above
+        return result
